@@ -1,1 +1,10 @@
 README.md
+materials
+__pycache__/
+*.pyc
+.venv/
+db.sqlite3
+logs/*.log
+dashboard/logs/*.log
+.env
+dashboard/.env

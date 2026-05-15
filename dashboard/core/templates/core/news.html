@@ -1,0 +1,12 @@
+{% extends "core/base.html" %}
+{% block title %}Новости{% endblock %}
+{% block content %}
+<section class="bg-white border rounded p-4">
+    <h1 class="h3 mb-3">Новости</h1>
+    <div class="list-group">
+        {% for item in news.items %}
+        <a class="list-group-item list-group-item-action" href="{{ item.url }}">{{ item.title }}</a>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
