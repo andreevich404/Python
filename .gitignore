@@ -1,1 +1,7 @@
 README.md
+logs/
+materials/
+.DS_Store
+__pycache__/
+.env
+db.sqlite3
