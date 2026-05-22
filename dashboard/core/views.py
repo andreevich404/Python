@@ -1,8 +1,9 @@
-from django.shortcuts import render
+from uuid import uuid4
 
-from core.services.currency import get_currency_rate
+from django.shortcuts import redirect, render
+
 from core.services.forecast import get_five_day_forecast
-from core.services.news import get_news
+from core.services.scraping import get_weather_details, get_weather_news
 from core.services.weather import get_current_weather
 
 
@@ -10,7 +11,27 @@ def home(request):
     return render(request, "core/base.html")
 
 
+def identify(request):
+    if request.method != "POST":
+        return redirect("home")
+
+    user_name = request.POST.get("user_name", "").strip()
+    if not user_name:
+        request.session["identify_error"] = "Введите имя пользователя"
+        return redirect("home")
+
+    request.session["user_name"] = user_name
+    request.session["user_id"] = uuid4().hex
+    request.session.pop("identify_error", None)
+    request.dashboard_result = f"пользователь {user_name} вошел"
+    return redirect("home")
+
+
 def weather_view(request):
+    user_response = _require_user(request)
+    if user_response:
+        return user_response
+
     city = request.GET.get("city", "Москва")
     weather = None
     error = None
@@ -29,6 +50,10 @@ def weather_view(request):
 
 
 def forecast_view(request):
+    user_response = _require_user(request)
+    if user_response:
+        return user_response
+
     city = request.GET.get("city", "Москва")
     forecast = None
     error = None
@@ -46,18 +71,56 @@ def forecast_view(request):
     )
 
 
-def currency_view(request):
-    code = request.GET.get("code", "USD")
-    currency = get_currency_rate(code)
-    request.dashboard_result = currency["summary"]
+def details_view(request):
+    user_response = _require_user(request)
+    if user_response:
+        return user_response
+
+    city = request.GET.get("city", "Москва")
+    details = None
+    error = None
+    try:
+        details = get_weather_details(city)
+        request.dashboard_result = details["summary"]
+    except ValueError as exc:
+        error = str(exc)
+        request.dashboard_result = f"ошибка: {error}"
+
     return render(
         request,
-        "core/currency.html",
-        {"currency": currency, "code": code.upper()},
+        "core/details.html",
+        {"details": details, "city": city, "error": error},
     )
 
 
-def news_view(request):
-    news = get_news()
-    request.dashboard_result = news["summary"]
-    return render(request, "core/news.html", {"news": news})
+def weather_news_view(request):
+    user_response = _require_user(request)
+    if user_response:
+        return user_response
+
+    news = None
+    error = None
+    try:
+        news = get_weather_news()
+        request.dashboard_result = news["summary"]
+    except ValueError as exc:
+        error = str(exc)
+        request.dashboard_result = f"ошибка: {error}"
+
+    return render(
+        request,
+        "core/weather_news.html",
+        {"news": news, "error": error},
+    )
+
+
+def _require_user(request):
+    if request.session.get("user_id"):
+        return None
+
+    request.dashboard_result = "требуется ввод имени пользователя"
+    return render(
+        request,
+        "core/base.html",
+        {"identify_error": "Введите имя, чтобы начать работу"},
+    )

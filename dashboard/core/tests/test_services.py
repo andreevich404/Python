@@ -2,9 +2,8 @@ from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase
 
-from core.services.currency import get_currency_rate
 from core.services.forecast import get_five_day_forecast
-from core.services.news import get_news
+from core.services.scraping import get_weather_details, get_weather_news
 from core.services.weather import get_current_weather
 
 
@@ -86,50 +85,45 @@ class ServiceTests(SimpleTestCase):
         ):
             get_five_day_forecast("Москва")
 
-    @patch("core.services.currency.requests.get")
-    def test_currency_service_parses_cbr_xml(self, mock_get):
+    @patch("core.services.scraping.requests.get")
+    def test_weather_details_service_scrapes_html(self, mock_get):
         mock_get.return_value = Mock(
             status_code=200,
-            content=b"""<?xml version="1.0" encoding="windows-1251"?>
-            <ValCurs>
-                <Valute>
-                    <CharCode>USD</CharCode>
-                    <Nominal>1</Nominal>
-                    <Name>Dollar</Name>
-                    <Value>81,45</Value>
-                </Valute>
-            </ValCurs>""",
+            text="""
+            <html><body>
+                <div class="term-container">+18°C|↑4km/h|755hPa</div>
+            </body></html>
+            """,
         )
 
-        result = get_currency_rate("usd")
+        result = get_weather_details("Москва")
 
-        self.assertEqual(result["code"], "USD")
-        self.assertEqual(result["nominal"], 1)
-        self.assertEqual(result["rate"], 81.45)
-        self.assertEqual(result["summary"], "1 USD = 81.45 RUB")
+        self.assertEqual(result["city"], "Москва")
+        self.assertEqual(result["temperature"], "+18°C")
+        self.assertEqual(result["wind"], "↑4km/h")
+        self.assertEqual(result["pressure"], "755hPa")
 
-    @patch("core.services.news.requests.get")
-    def test_news_service_parses_lenta_links(self, mock_get):
+    @patch("core.services.scraping.requests.get")
+    def test_weather_news_service_scrapes_weather_links(self, mock_get):
         html = """
         <html><body>
-            <a class="card-mini" href="/news/2026/05/08/one/">
-                Первая новость
-            </a>
-            <a
-                class="card-mini"
-                href="https://lenta.ru/news/2026/05/08/two/"
-            >
-                Вторая новость
+            <a href="/news/weather-rain/">Сильный дождь придет вечером</a>
+            <a href="/news/economy/">Коротко</a>
+            <a href="https://www.gismeteo.ru/news/snow/">
+                Снег ожидается в регионе
             </a>
         </body></html>
         """
         mock_get.return_value = Mock(status_code=200, text=html)
 
-        result = get_news(limit=2)
+        result = get_weather_news(limit=2)
 
         self.assertEqual(len(result["items"]), 2)
-        self.assertEqual(result["items"][0]["title"], "Первая новость")
+        self.assertEqual(
+            result["items"][0]["title"],
+            "Сильный дождь придет вечером",
+        )
         self.assertEqual(
             result["items"][0]["url"],
-            "https://lenta.ru/news/2026/05/08/one/",
+            "https://www.gismeteo.ru/news/weather-rain/",
         )

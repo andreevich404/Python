@@ -30,6 +30,9 @@ class RequestLogMiddleware:
             f"[{timestamp}] {request.method} {request.get_full_path()} -> "
             f"{status} | Результат: {result}\n"
         )
-        log_path = logs_dir / f"{request.session.session_key}.log"
+        user_id = request.session.get("user_id") or request.session.session_key
+        user_name = request.session.get("user_name", "anonymous")
+        line = line.rstrip("\n") + f" | Пользователь: {user_name}\n"
+        log_path = logs_dir / f"{user_id}.log"
         with log_path.open("a", encoding="utf-8") as log_file:
             log_file.write(line)
